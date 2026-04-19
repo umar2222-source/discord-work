@@ -1,0 +1,124 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Account Portal</title>
+  <link rel="stylesheet" href="styles.css" />
+</head>
+<body>
+  <div class="brand-logo">Discord Work</div>
+  <button id="themeMenuBtn" class="theme-menu-btn" type="button" aria-label="Toggle dark and light mode">
+    <span id="themeMenuIcon">☰🌙</span>
+    <span id="themeMenuText">Dark Mode</span>
+  </button>
+  <button id="openAdminBtn" class="admin-corner-btn" type="button">Admin</button>
+
+  <main id="authPortal" class="container auth-container">
+    <section class="card auth-card">
+      <div>
+        <h1>Account Portal</h1>
+        <p class="muted">Create a new account to continue.</p>
+      </div>
+
+      <form id="signUpForm" class="auth-form">
+        <h2>Create New Account</h2>
+        <label class="label" for="signUpName">Full Name</label>
+        <input id="signUpName" class="input-control" type="text" required />
+
+        <label class="label" for="signUpEmail">Email</label>
+        <input id="signUpEmail" class="input-control" type="email" required />
+
+        <label class="label" for="signUpPassword">Password</label>
+        <input id="signUpPassword" class="input-control" type="password" minlength="6" required />
+
+        <label class="label" for="signUpConfirmPassword">Confirm Password</label>
+        <input id="signUpConfirmPassword" class="input-control" type="password" minlength="6" required />
+
+        <button class="btn btn-primary" type="submit">Create Account</button>
+      </form>
+
+      <p id="authMessage" class="message"></p>
+    </section>
+  </main>
+
+  <main id="signInPortal" class="container hidden">
+    <section class="card auth-card">
+      <div>
+        <h1>Sign In</h1>
+        <p class="muted">Use your account credentials to enter the portal.</p>
+      </div>
+
+      <form id="signInForm" class="auth-form">
+        <h2>Sign In</h2>
+        <label class="label" for="signInEmail">Email</label>
+        <input id="signInEmail" class="input-control" type="email" required />
+
+        <label class="label" for="signInPassword">Password</label>
+        <input id="signInPassword" class="input-control" type="password" required />
+
+        <button class="btn btn-primary" type="submit">Sign In</button>
+      </form>
+      <p class="muted switch-hint">If you're not registered <button id="goToSignUpBtn" class="text-link-btn" type="button">Sign Up</button></p>
+
+      <p id="signInMessage" class="message"></p>
+    </section>
+  </main>
+
+  <main id="dashboard" class="container hidden">
+    <section class="card auth-card">
+      <h2>Work Portal</h2>
+      <p id="welcomeText" class="muted"></p>
+
+      <div id="timeDisplay" class="time-display">00:00:00</div>
+      <div class="timer-controls">
+        <button id="startBtn" class="btn btn-primary" type="button">Start</button>
+        <button id="pauseBtn" class="btn btn-secondary" type="button" disabled>Pause</button>
+        <button id="stopBtn" class="btn btn-danger" type="button" disabled>Stop</button>
+      </div>
+      <p id="timerStatus" class="message">Status: Idle</p>
+
+      <button id="logoutBtn" class="btn btn-secondary" type="button">Logout</button>
+    </section>
+  </main>
+
+  <main id="adminSignInPortal" class="container hidden">
+    <section class="card auth-card">
+      <div>
+        <h1>Admin Sign In</h1>
+        <p class="muted">Enter admin username and password.</p>
+      </div>
+
+      <form id="adminSignInForm" class="auth-form">
+        <label class="label" for="adminUsername">Username</label>
+        <input id="adminUsername" class="input-control" type="text" required />
+
+        <label class="label" for="adminPassword">Password</label>
+        <input id="adminPassword" class="input-control" type="password" required />
+
+        <button class="btn btn-primary" type="submit">Sign In Admin</button>
+        <button id="backToSignInBtn" class="btn btn-secondary" type="button">Back</button>
+      </form>
+
+      <p id="adminSignInMessage" class="message"></p>
+    </section>
+  </main>
+
+  <main id="adminPortal" class="container hidden">
+    <section class="card auth-card">
+      <h2>Admin Monitoring Portal</h2>
+      <p class="muted">Track when users start, pause, and stop their timer.</p>
+
+      <h3>Latest User Status</h3>
+      <ul id="adminStatusList" class="entries-list"></ul>
+
+      <h3>Activity Log</h3>
+      <ul id="adminActivityList" class="entries-list"></ul>
+
+      <button id="adminLogoutBtn" class="btn btn-secondary" type="button">Admin Logout</button>
+    </section>
+  </main>
+
+  <script src="script.js"></script>
+</body>
+</html>
