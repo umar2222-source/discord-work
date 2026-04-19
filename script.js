@@ -41,8 +41,32 @@ const TIMER_EVENTS_KEY = "account-portal-timer-events";
 const USER_STATUS_KEY = "account-portal-user-status";
 const ADMIN_USERNAME = "admin";
 const ADMIN_PASSWORD = "admin123";
+const SUPABASE_URL = window.SUPABASE_URL || "";
+const SUPABASE_ANON_KEY = window.SUPABASE_ANON_KEY || "";
+const supabaseClient =
+  window.supabase && SUPABASE_URL && SUPABASE_ANON_KEY
+    ? window.supabase.createClient(SUPABASE_URL, SUPABASE_ANON_KEY)
+    : null;
 
-function loadTimerEvents() {
+function useSupabase() {
+  return Boolean(supabaseClient);
+}
+
+async function loadTimerEvents() {
+  if (useSupabase()) {
+    const { data, error } = await supabaseClient
+      .from("timer_events")
+      .select("*")
+      .order("created_at", { ascending: true });
+    if (!error) {
+      return (data || []).map((row) => ({
+        name: row.name,
+        email: row.email,
+        action: row.action,
+        at: row.at
+      }));
+    }
+  }
   try {
     const raw = localStorage.getItem(TIMER_EVENTS_KEY);
     return raw ? JSON.parse(raw) : [];
@@ -51,11 +75,24 @@ function loadTimerEvents() {
   }
 }
 
-function saveTimerEvents(events) {
+async function saveTimerEvents(events) {
+  if (useSupabase()) {
+    return;
+  }
   localStorage.setItem(TIMER_EVENTS_KEY, JSON.stringify(events));
 }
 
-function loadUserStatuses() {
+async function loadUserStatuses() {
+  if (useSupabase()) {
+    const { data, error } = await supabaseClient.from("user_statuses").select("*");
+    if (!error) {
+      const mapped = {};
+      (data || []).forEach((row) => {
+        mapped[row.email] = { status: row.status, at: row.at, name: row.name };
+      });
+      return mapped;
+    }
+  }
   try {
     const raw = localStorage.getItem(USER_STATUS_KEY);
     return raw ? JSON.parse(raw) : {};
@@ -64,11 +101,24 @@ function loadUserStatuses() {
   }
 }
 
-function saveUserStatuses(statuses) {
+async function saveUserStatuses(statuses) {
+  if (useSupabase()) {
+    return;
+  }
   localStorage.setItem(USER_STATUS_KEY, JSON.stringify(statuses));
 }
 
-function loadUsers() {
+async function loadUsers() {
+  if (useSupabase()) {
+    const { data, error } = await supabaseClient.from("users").select("*");
+    if (!error) {
+      return (data || []).map((row) => ({
+        name: row.name,
+        email: row.email,
+        password: row.password
+      }));
+    }
+  }
   try {
     const raw = localStorage.getItem(USERS_KEY);
     return raw ? JSON.parse(raw) : [];
@@ -77,7 +127,10 @@ function loadUsers() {
   }
 }
 
-function saveUsers(users) {
+async function saveUsers(users) {
+  if (useSupabase()) {
+    return;
+  }
   localStorage.setItem(USERS_KEY, JSON.stringify(users));
 }
 
@@ -172,10 +225,10 @@ function showAdminSignIn() {
   }
 }
 
-function renderAdminPortal() {
-  const events = loadTimerEvents().slice().reverse();
-  const users = loadUsers();
-  const statuses = loadUserStatuses();
+async function renderAdminPortal() {
+  const events = (await loadTimerEvents()).slice().reverse();
+  const users = await loadUsers();
+  const statuses = await loadUserStatuses();
 
   adminStatusList.innerHTML = "";
   if (users.length === 0) {
@@ -211,33 +264,47 @@ function showAdminPortal() {
   dashboard.classList.add("hidden");
   adminSignInPortal.classList.add("hidden");
   adminPortal.classList.remove("hidden");
-  renderAdminPortal();
+  void renderAdminPortal();
   if (adminRefreshTimer) {
     clearInterval(adminRefreshTimer);
   }
-  adminRefreshTimer = setInterval(renderAdminPortal, 1500);
+  adminRefreshTimer = setInterval(() => {
+    void renderAdminPortal();
+  }, 1500);
 }
 
-function logTimerEvent(action) {
+async function logTimerEvent(action) {
   if (!currentSession) return;
-  const events = loadTimerEvents();
-  events.push({
+  const newEvent = {
     name: currentSession.name,
     email: currentSession.email,
     action,
     at: new Date().toLocaleString()
-  });
-  saveTimerEvents(events.slice(-300));
+  };
+  if (useSupabase()) {
+    await supabaseClient.from("timer_events").insert(newEvent);
+    return;
+  }
+  const events = await loadTimerEvents();
+  events.push(newEvent);
+  await saveTimerEvents(events.slice(-300));
 }
 
-function updateUserStatus(status) {
+async function updateUserStatus(status) {
   if (!currentSession) return;
-  const statuses = loadUserStatuses();
-  statuses[currentSession.email] = {
+  const record = {
+    email: currentSession.email,
+    name: currentSession.name,
     status,
     at: new Date().toLocaleString()
   };
-  saveUserStatuses(statuses);
+  if (useSupabase()) {
+    await supabaseClient.from("user_statuses").upsert(record, { onConflict: "email" });
+    return;
+  }
+  const statuses = await loadUserStatuses();
+  statuses[currentSession.email] = record;
+  await saveUserStatuses(statuses);
 }
 
 function formatDuration(ms) {
@@ -278,7 +345,7 @@ function resetTimer() {
   setStatus("Idle");
   timeDisplay.classList.remove("running");
   if (currentSession) {
-    updateUserStatus("Idle");
+    void updateUserStatus("Idle");
   }
   updateButtons();
 }
@@ -292,8 +359,8 @@ function startTimer() {
   timerId = setInterval(refreshTime, 250);
   setStatus("Working");
   timeDisplay.classList.add("running");
-  updateUserStatus("Working");
-  logTimerEvent("Start");
+  void updateUserStatus("Working");
+  void logTimerEvent("Start");
   updateButtons();
 }
 
@@ -308,18 +375,18 @@ function pauseTimer() {
   refreshTime();
   setStatus("Paused");
   timeDisplay.classList.remove("running");
-  updateUserStatus("Paused");
-  logTimerEvent("Pause");
+  void updateUserStatus("Paused");
+  void logTimerEvent("Pause");
   updateButtons();
 }
 
 function stopTimer() {
-  updateUserStatus("Stopped");
-  logTimerEvent("Stop");
+  void updateUserStatus("Stopped");
+  void logTimerEvent("Stop");
   resetTimer();
 }
 
-signUpForm.addEventListener("submit", (event) => {
+signUpForm.addEventListener("submit", async (event) => {
   event.preventDefault();
   const name = document.getElementById("signUpName").value.trim();
   const email = document.getElementById("signUpEmail").value.trim().toLowerCase();
@@ -335,15 +402,23 @@ signUpForm.addEventListener("submit", (event) => {
     return;
   }
 
-  const users = loadUsers();
+  const users = await loadUsers();
   const exists = users.some((user) => user.email === email);
   if (exists) {
     authMessage.textContent = "Email is already registered. Please sign in.";
     return;
   }
 
-  users.push({ name, email, password });
-  saveUsers(users);
+  if (useSupabase()) {
+    const { error } = await supabaseClient.from("users").insert({ name, email, password });
+    if (error) {
+      authMessage.textContent = "Could not create account in Supabase.";
+      return;
+    }
+  } else {
+    users.push({ name, email, password });
+    await saveUsers(users);
+  }
   authMessage.textContent = "Account created. Please sign in to continue.";
   signUpForm.reset();
   showSignIn();
@@ -352,11 +427,11 @@ signUpForm.addEventListener("submit", (event) => {
   document.getElementById("signInPassword").focus();
 });
 
-signInForm.addEventListener("submit", (event) => {
+signInForm.addEventListener("submit", async (event) => {
   event.preventDefault();
   const email = document.getElementById("signInEmail").value.trim().toLowerCase();
   const password = document.getElementById("signInPassword").value;
-  const users = loadUsers();
+  const users = await loadUsers();
   const user = users.find((item) => item.email === email && item.password === password);
   if (!user) {
     signInMessage.textContent = "Invalid email or password.";
@@ -365,7 +440,7 @@ signInForm.addEventListener("submit", (event) => {
 
   currentSession = { name: user.name, email: user.email };
   saveSession(currentSession);
-  updateUserStatus("Online");
+  void updateUserStatus("Online");
   signInForm.reset();
   signInMessage.textContent = "";
   showDashboard();
@@ -405,12 +480,12 @@ stopBtn.addEventListener("click", stopTimer);
 window.addEventListener("storage", (event) => {
   if (!isAdminLoggedIn) return;
   if (event.key === TIMER_EVENTS_KEY || event.key === USER_STATUS_KEY || event.key === USERS_KEY) {
-    renderAdminPortal();
+    void renderAdminPortal();
   }
 });
 
 logoutBtn.addEventListener("click", () => {
-  updateUserStatus("Offline");
+  void updateUserStatus("Offline");
   currentSession = null;
   clearSession();
   resetTimer();
@@ -419,6 +494,9 @@ logoutBtn.addEventListener("click", () => {
 
 currentSession = loadSession();
 loadTheme();
+if (useSupabase()) {
+  signInMessage.textContent = "Supabase mode enabled.";
+}
 if (currentSession) {
   showDashboard();
 } else {

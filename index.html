@@ -13,6 +13,10 @@
     <span id="themeMenuText">Dark Mode</span>
   </button>
   <button id="openAdminBtn" class="admin-corner-btn" type="button">Admin</button>
+  <script>
+    window.SUPABASE_URL = window.SUPABASE_URL || "";
+    window.SUPABASE_ANON_KEY = window.SUPABASE_ANON_KEY || "";
+  </script>
 
   <main id="authPortal" class="container auth-container">
     <section class="card auth-card">
@@ -119,6 +123,7 @@
     </section>
   </main>
 
+  <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
   <script src="script.js"></script>
 </body>
 </html>
