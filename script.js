@@ -32,11 +32,13 @@ let startedAt = null;
 let running = false;
 let paused = false;
 let isAdminLoggedIn = false;
+let adminRefreshTimer = null;
 
 const USERS_KEY = "account-portal-users";
 const SESSION_KEY = "account-portal-session";
 const THEME_KEY = "account-portal-theme";
 const TIMER_EVENTS_KEY = "account-portal-timer-events";
+const USER_STATUS_KEY = "account-portal-user-status";
 const ADMIN_USERNAME = "admin";
 const ADMIN_PASSWORD = "admin123";
 
@@ -51,6 +53,19 @@ function loadTimerEvents() {
 
 function saveTimerEvents(events) {
   localStorage.setItem(TIMER_EVENTS_KEY, JSON.stringify(events));
+}
+
+function loadUserStatuses() {
+  try {
+    const raw = localStorage.getItem(USER_STATUS_KEY);
+    return raw ? JSON.parse(raw) : {};
+  } catch {
+    return {};
+  }
+}
+
+function saveUserStatuses(statuses) {
+  localStorage.setItem(USER_STATUS_KEY, JSON.stringify(statuses));
 }
 
 function loadUsers() {
@@ -151,26 +166,27 @@ function showAdminSignIn() {
   adminPortal.classList.add("hidden");
   adminSignInPortal.classList.remove("hidden");
   adminSignInMessage.textContent = "";
+  if (adminRefreshTimer) {
+    clearInterval(adminRefreshTimer);
+    adminRefreshTimer = null;
+  }
 }
 
 function renderAdminPortal() {
   const events = loadTimerEvents().slice().reverse();
-  const latestByEmail = new Map();
-  events.forEach((event) => {
-    if (!latestByEmail.has(event.email)) {
-      latestByEmail.set(event.email, event);
-    }
-  });
+  const users = loadUsers();
+  const statuses = loadUserStatuses();
 
   adminStatusList.innerHTML = "";
-  if (latestByEmail.size === 0) {
+  if (users.length === 0) {
     const li = document.createElement("li");
-    li.textContent = "No user activity yet.";
+    li.textContent = "No users registered yet.";
     adminStatusList.append(li);
   } else {
-    latestByEmail.forEach((event) => {
+    users.forEach((user) => {
+      const state = statuses[user.email] || { status: "Offline", at: "N/A" };
       const li = document.createElement("li");
-      li.textContent = `${event.name} (${event.email}) - ${event.action} at ${event.at}`;
+      li.textContent = `${user.name} (${user.email}) - ${state.status} at ${state.at}`;
       adminStatusList.append(li);
     });
   }
@@ -196,6 +212,10 @@ function showAdminPortal() {
   adminSignInPortal.classList.add("hidden");
   adminPortal.classList.remove("hidden");
   renderAdminPortal();
+  if (adminRefreshTimer) {
+    clearInterval(adminRefreshTimer);
+  }
+  adminRefreshTimer = setInterval(renderAdminPortal, 1500);
 }
 
 function logTimerEvent(action) {
@@ -208,6 +228,16 @@ function logTimerEvent(action) {
     at: new Date().toLocaleString()
   });
   saveTimerEvents(events.slice(-300));
+}
+
+function updateUserStatus(status) {
+  if (!currentSession) return;
+  const statuses = loadUserStatuses();
+  statuses[currentSession.email] = {
+    status,
+    at: new Date().toLocaleString()
+  };
+  saveUserStatuses(statuses);
 }
 
 function formatDuration(ms) {
@@ -247,6 +277,9 @@ function resetTimer() {
   refreshTime();
   setStatus("Idle");
   timeDisplay.classList.remove("running");
+  if (currentSession) {
+    updateUserStatus("Idle");
+  }
   updateButtons();
 }
 
@@ -259,6 +292,7 @@ function startTimer() {
   timerId = setInterval(refreshTime, 250);
   setStatus("Working");
   timeDisplay.classList.add("running");
+  updateUserStatus("Working");
   logTimerEvent("Start");
   updateButtons();
 }
@@ -274,11 +308,13 @@ function pauseTimer() {
   refreshTime();
   setStatus("Paused");
   timeDisplay.classList.remove("running");
+  updateUserStatus("Paused");
   logTimerEvent("Pause");
   updateButtons();
 }
 
 function stopTimer() {
+  updateUserStatus("Stopped");
   logTimerEvent("Stop");
   resetTimer();
 }
@@ -329,6 +365,7 @@ signInForm.addEventListener("submit", (event) => {
 
   currentSession = { name: user.name, email: user.email };
   saveSession(currentSession);
+  updateUserStatus("Online");
   signInForm.reset();
   signInMessage.textContent = "";
   showDashboard();
@@ -354,6 +391,10 @@ openAdminBtn.addEventListener("click", showAdminSignIn);
 backToSignInBtn.addEventListener("click", showSignIn);
 adminLogoutBtn.addEventListener("click", () => {
   isAdminLoggedIn = false;
+  if (adminRefreshTimer) {
+    clearInterval(adminRefreshTimer);
+    adminRefreshTimer = null;
+  }
   showAdminSignIn();
 });
 goToSignUpBtn.addEventListener("click", showSignUp);
@@ -361,7 +402,15 @@ startBtn.addEventListener("click", startTimer);
 pauseBtn.addEventListener("click", pauseTimer);
 stopBtn.addEventListener("click", stopTimer);
 
+window.addEventListener("storage", (event) => {
+  if (!isAdminLoggedIn) return;
+  if (event.key === TIMER_EVENTS_KEY || event.key === USER_STATUS_KEY || event.key === USERS_KEY) {
+    renderAdminPortal();
+  }
+});
+
 logoutBtn.addEventListener("click", () => {
+  updateUserStatus("Offline");
   currentSession = null;
   clearSession();
   resetTimer();
